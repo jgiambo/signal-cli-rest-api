@@ -1786,9 +1786,9 @@ func (a *Api) QuitGroup(c *gin.Context) {
 // @Param groupid path string true "Group ID"
 // @Router /v1/groups/{number}/{groupid}/terminate [post]
 func (a *Api) TerminateGroup(c *gin.Context) {
-	_, number, err := accountIdentifierFromParam(c)
+	number, err := url.PathUnescape(c.Param("number"))
 	if err != nil {
-		c.JSON(400, Error{Msg: err.Error()})
+		c.JSON(400, Error{Msg: "Couldn't process request - malformed number"})
 		return
 	}
 	if number == "" {
