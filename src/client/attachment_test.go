@@ -108,3 +108,44 @@ func Test_Attachment_ExtractMetadata_ShouldPrepareDataFor_toDataForSignal(t *tes
 		})
 	}
 }
+
+func Test_Attachment_IsVoiceNote(t *testing.T) {
+	// base64 of a minimal WAV and JPEG header, so that the type can be detected from the content
+	const wav = "UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA="
+	const jpeg = "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBD"
+
+	tests := []struct {
+		name        string
+		attachments []string
+		want        bool
+	}{
+		{"no attachments", []string{}, false},
+		{"audio data uri", []string{"data:audio/aac;base64," + wav}, true},
+		{"audio data uri with filename", []string{"data:audio/mp4;filename=note.m4a;base64," + wav}, true},
+		{"uppercase audio data uri", []string{"data:AUDIO/AAC;base64," + wav}, true},
+		{"plain base64 audio", []string{wav}, true},
+		{"image data uri", []string{"data:image/jpeg;base64," + jpeg}, false},
+		{"plain base64 image", []string{jpeg}, false},
+		{"data uri wins over content", []string{"data:application/octet-stream;base64," + wav}, false},
+		{"two audio attachments", []string{"data:audio/aac;base64," + wav, "data:audio/aac;base64," + wav}, false},
+		{"audio and image", []string{"data:audio/aac;base64," + wav, "data:image/jpeg;base64," + jpeg}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			entries := []AttachmentEntry{}
+			for _, attachment := range tt.attachments {
+				entry := NewAttachmentEntry(attachment, t.TempDir()+"/")
+				if err := entry.storeBase64AsTemporaryFile(); err != nil {
+					t.Fatal(err)
+				}
+				defer entry.cleanUp()
+				entries = append(entries, *entry)
+			}
+
+			if got := isVoiceNote(entries); got != tt.want {
+				t.Errorf("isVoiceNote() got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

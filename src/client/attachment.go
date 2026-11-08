@@ -153,6 +153,28 @@ func (attachmentEntry *AttachmentEntry) isWithMetaData() bool {
 	return len(attachmentEntry.MimeInfo) > 0 && len(attachmentEntry.Base64) > 0
 }
 
+// isAudio prefers the mime type from the data URI. Attachments sent as plain
+// base64 don't have one, so those are detected from the stored file instead.
+func (attachmentEntry *AttachmentEntry) isAudio() bool {
+	mimeInfo := attachmentEntry.MimeInfo
+	if len(mimeInfo) == 0 && len(attachmentEntry.FilePath) > 0 {
+		detected, err := mimetype.DetectFile(attachmentEntry.FilePath)
+		if err != nil {
+			return false
+		}
+		mimeInfo = detected.String()
+	}
+
+	return strings.HasPrefix(strings.ToLower(mimeInfo), "audio/")
+}
+
+// isVoiceNote reports whether the attachments should be sent as a voice note.
+// signal-cli's voice note flag applies to every attachment of a message, so
+// it's only set for a message with a single audio attachment.
+func isVoiceNote(attachmentEntries []AttachmentEntry) bool {
+	return len(attachmentEntries) == 1 && attachmentEntries[0].isAudio()
+}
+
 func (attachmentEntry *AttachmentEntry) toDataForSignal() string {
 	if len(attachmentEntry.FilePath) > 0 {
 		return attachmentEntry.FilePath
